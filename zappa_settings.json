@@ -1,0 +1,16 @@
+{
+    "production": {
+      "app_function": "app.app",
+      "aws_region": "us-east-1",
+      "profile_name": "order-api",
+      "project_name": "order-api",
+      "runtime": "python3.9",
+      "s3_bucket": "zappa-u54uxo053",
+      "environment_variables": {
+        "SPREADSHEET_ID": "1TADHEDFuzm1yqfoAZMKTzB1qYJi3kdFf12OqaUJL-Fc",
+        "SECRET_NAME": "google-sheets-service-account",
+        "AWS_REGION": "us-east-1"
+      }
+    }
+  }
+  

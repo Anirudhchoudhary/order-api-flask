@@ -33,6 +33,10 @@ def get_credentials_from_secret(secret_name, region_name):
 # Initialize credentials (once)
 credentials = get_credentials_from_secret(SECRET_NAME, AWS_REGION)
 
+@app.route('/')
+def index():
+    return jsonify({'message': 'Order API is running'}), 200
+
 @app.route('/add-order', methods=['POST'])
 def add_order():
     try:
