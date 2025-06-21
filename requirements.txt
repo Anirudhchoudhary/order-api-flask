@@ -1,6 +1,7 @@
 flask
 google-api-python-client
 google-auth
+boto3
 google-auth-oauthlib
 flask-cors
 python-dotenv

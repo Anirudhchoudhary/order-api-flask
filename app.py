@@ -1,10 +1,11 @@
 import os
+import json
+import boto3
 import urllib.parse
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from googleapiclient.discovery import build
 from google.oauth2 import service_account
-from google.auth import default as google_auth_default
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -12,20 +13,25 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-# ENV VARIABLES
-SPREADSHEET_ID = os.getenv('SPREADSHEET_ID', 'your-default-sheet-id')
-RANGE_NAME = os.getenv('RANGE_NAME', 'Daily-Order!A1')
-ENV = os.getenv('ENV', 'development')
+# ENV variables
+SPREADSHEET_ID = os.environ.get("SPREADSHEET_ID")
+RANGE_NAME = os.environ.get("RANGE_NAME", "Daily-Order!A1")
+SECRET_NAME = os.environ.get("SECRET_NAME", "google-sheets-service-account")
+AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
 
-# Load credentials
-if ENV == 'production':
-    credentials, _ = google_auth_default(scopes=["https://www.googleapis.com/auth/spreadsheets"])
-else:
-    SERVICE_ACCOUNT_FILE = 'service-account.json'
-    credentials = service_account.Credentials.from_service_account_file(
-        SERVICE_ACCOUNT_FILE,
+def get_credentials_from_secret(secret_name, region_name):
+    """Load Google service account credentials from AWS Secrets Manager"""
+    client = boto3.client("secretsmanager", region_name=region_name)
+    response = client.get_secret_value(SecretId=secret_name)
+    service_account_info = json.loads(response["SecretString"])
+    credentials = service_account.Credentials.from_service_account_info(
+        service_account_info,
         scopes=["https://www.googleapis.com/auth/spreadsheets"]
     )
+    return credentials
+
+# Initialize credentials (once)
+credentials = get_credentials_from_secret(SECRET_NAME, AWS_REGION)
 
 @app.route('/add-order', methods=['POST'])
 def add_order():
@@ -35,16 +41,14 @@ def add_order():
         cart_items = data.get('cartItems')
 
         # Decode and format message
-        decoded_message = urllib.parse.unquote(order_data.get('message') or '').strip()
+        decoded_message = urllib.parse.unquote(order_data.get('message', '')).strip()
         decoded_message = decoded_message.replace("*", "").replace("•", "🔹")
 
-        # Create cart summary string
         cart_summary = ', '.join([
             f"{item['name']} x{item['cartQuantity']} (₹{item['price']})"
             for item in cart_items
         ])
 
-        # Compose row for Sheet
         row = [
             order_data.get('name'),
             order_data.get('phone'),
@@ -56,7 +60,6 @@ def add_order():
             cart_summary,
         ]
 
-        # Send to Google Sheets
         service = build('sheets', 'v4', credentials=credentials)
         sheet = service.spreadsheets()
 
@@ -72,8 +75,5 @@ def add_order():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 8080))
-    debug = ENV != 'production'
-    app.run(host='0.0.0.0', port=port, debug=debug)
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)), debug=os.environ.get('ENV') != 'production')
